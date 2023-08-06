@@ -104,10 +104,7 @@ fi
 # install Miniconda, a self contained Python distribution, into AppDir
 case "$ARCH" in
     "x86_64")
-        miniconda_installer_filename=Miniconda3-latest-Linux-x86_64.sh
-        ;;
-    "i386"|"i686")
-        miniconda_installer_filename=Miniconda3-latest-Linux-x86.sh
+        mambaforge_installer_filename="Mambaforge-Linux-x86_64.sh"
         ;;
     *)
         log "ERROR: Unknown Miniconda arch: $ARCH"
@@ -116,49 +113,45 @@ case "$ARCH" in
 esac
 
 pushd "$CONDA_DOWNLOAD_DIR"
-    miniconda_url=https://repo.anaconda.com/miniconda/"$miniconda_installer_filename"
+    mambaforge_url="https://github.com/conda-forge/miniforge/releases/latest/download/${mambaforge_installer_filename}"
     # let's make sure the file exists before we then rudimentarily ensure mutual exclusive access to it with flock
     # we set the timestamp to epoch 0; this should likely trigger a redownload for the first time
-    touch "$miniconda_installer_filename" -d '@0'
+    touch "$mambaforge_installer_filename" -d '@0'
 
     # now, let's download the file
-    flock "$miniconda_installer_filename" wget -N -c "$miniconda_url"
+    flock "$mambaforge_installer_filename" wget -N -c "$mambaforge_url"
 popd
 
 # install into usr/conda/ instead of usr/ to make sure that the libraries shipped with conda don't overwrite or
 # interfere with libraries bundled by other plugins or linuxdeploy itself
-bash "$CONDA_DOWNLOAD_DIR"/"$miniconda_installer_filename" -b -p "$APPDIR"/usr/conda -f
+bash "$CONDA_DOWNLOAD_DIR"/"$mambaforge_installer_filename" -b -p "$APPDIR"/usr/conda -f
+
+CONDA="${APPDIR}/usr/conda/bin/conda"
+MAMBA="${APPDIR}/usr/conda/bin/mamba"
+PIP="${APPDIR}/usr/conda/bin/pip"
 
 # we don't want to touch the system, therefore using a temporary home
 mkdir -p _temp_home
 export HOME=$(readlink -f _temp_home)
 
-# conda-forge is used by many conda packages, therefore we'll add that channel by default
-"$APPDIR"/usr/conda/bin/conda config --add channels conda-forge
-
-# force-install libxi, required by a majority of packages on some more annoying distributions like e.g., Arch
-#conda install -y xorg-libxi
-
 # force another python version if requested
 if [ "$CONDA_PYTHON_VERSION" != "" ]; then
-    "$APPDIR"/usr/conda/bin/conda install -y python="$CONDA_PYTHON_VERSION"
+    "$APPDIR"/usr/conda/bin/mamba install --yes python="$CONDA_PYTHON_VERSION"
 fi
 
 # add channels specified via $CONDA_CHANNELS
 IFS=';' read -ra chans <<< "$CONDA_CHANNELS"
 for chan in "${chans[@]}"; do
-    "$APPDIR"/usr/conda/bin/conda config --append channels "$chan"
+    "${CONDA}" config --add channels "$chan"
 done
+
+"${CONDA}" config --remove channels defaults || true
+
+conda config --show
+conda config --show channels
 
 # install packages specified via $CONDA_PACKAGES
-IFS=';' read -ra pkgs <<< "$CONDA_PACKAGES"
-for pkg in "${pkgs[@]}"; do
-    "$APPDIR"/usr/conda/bin/conda install -y "$pkg"
-done
-
-# make sure pip is up to date
-"$APPDIR"/usr/conda/bin/python -m ensurepip
-"$APPDIR"/usr/conda/bin/pip install -U pip
+"${MAMBA}" install --yes ${CONDA_PACKAGES}
 
 # install requirements from PyPI specified via $PIP_REQUIREMENTS
 if [ "$PIP_REQUIREMENTS" != "" ]; then
@@ -166,7 +159,7 @@ if [ "$PIP_REQUIREMENTS" != "" ]; then
         pushd "$PIP_WORKDIR"
     fi
 
-    "$APPDIR"/usr/conda/bin/pip install -U $PIP_REQUIREMENTS ${PIP_PREFIX:+--prefix=$PIP_PREFIX} ${PIP_VERBOSE:+-v}
+    "${PIP}" install -U $PIP_REQUIREMENTS ${PIP_PREFIX:+--prefix=$PIP_PREFIX} ${PIP_VERBOSE:+-v}
 
     if [ "$PIP_WORKDIR" != "" ]; then
         popd

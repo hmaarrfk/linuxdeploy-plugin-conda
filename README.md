@@ -59,7 +59,7 @@ Relative paths work as well.
 This generates a working FreeCAD AppImage from Conda ingredients, including Qt and PyQt:
 
 ```bash
-wget -c "https://raw.githubusercontent.com/TheAssassin/linuxdeploy-plugin-conda/master/linuxdeploy-plugin-conda.sh"
+wget -c "https://raw.githubusercontent.com/hmaarrfk/linuxdeploy-plugin-conda/master/linuxdeploy-plugin-conda.sh"
 wget -c "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
 chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-conda.sh
 
